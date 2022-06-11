@@ -197,7 +197,7 @@ GOCluster<-function(chord, process, metric, clust, clust.by, nlfc, lfc.col, lfc.
 #' }
 #' @export
 
-GOChord <- function(data, title, space, gene.order, gene.size, gene.space, nlfc = 1, lfc.col, lfc.min, lfc.max, ribbon.col, border.size, process.label, limit, scale.title){
+GOChord <- function(data, title, space, gene.order, gene.size, gene.space, nlfc = 1, lfc.col, lfc.min, lfc.max, ribbon.col, border.size, process.label=8, limit, scale.title, label_term=F, guide_term=T){
   y <- id <- xpro <- ypro <- xgen <- ygen <- lx <- ly <- ID <- logFC <- NULL
   Ncol <- dim(data)[2]
   
@@ -274,10 +274,8 @@ GOChord <- function(data, title, space, gene.order, gene.size, gene.space, nlfc 
   }else{
     df_genes <- data.frame(x = xp, y = yp, id = rep(c(1:Nrow), each = 4 + 2 * l))
   }
-  aseq <- seq(0, 180, length = length(x2)); angle <- c()
-  for (o in aseq) if((o + 270) <= 360) angle <- c(angle, o + 270) else angle <- c(angle, o - 90)
-  df_texg <- data.frame(xgen = (r1 + gene.space) * sin(x2 + xmax2/2),ygen = (r1 + gene.space) * cos(x2 + xmax2 / 2),labels = rownames(cdata), angle = angle)
-  df_texp <- data.frame(xpro = (r1 + 0.15) * sin(x + xmax / 2),ypro = (r1 + 0.15) * cos(x + xmax / 2), labels = colnames(cdata), stringsAsFactors = FALSE)
+  df_texg <- data.frame(xgen = (r1 + gene.space) * sin(x2 + xmax2/2),ygen = (r1 + gene.space) * cos(x2 + xmax2 / 2),labels = rownames(cdata), angle = 270-(x2 + xmax2/2)/pi*180)
+  df_texp <- data.frame(xpro = (r1 + gene.space) * sin(x + xmax / 2),ypro = (r1 + gene.space) * cos(x + xmax / 2), labels = colnames(cdata), angle = 90-(x + xmax/2)/pi*180, stringsAsFactors = FALSE)
   cols <- rep(colRib, each = 4 + 2 * l)
   x.end <- c(); y.end <- c(); processID <- c()
   for (gs in 1:length(x2)){
@@ -308,21 +306,23 @@ GOChord <- function(data, title, space, gene.order, gene.size, gene.space, nlfc 
     df_genes$logFC <- logFC
   }
   
-  g<- ggplot() +
-    geom_polygon(data = df_process, aes(x, y, group=id), fill='gray70', inherit.aes = F,color='black') +
-    geom_polygon(data = df_process, aes(x, y, group=id), fill=cols, inherit.aes = F,alpha=0.6,color='black') +	
-    geom_point(aes(x = xpro, y = ypro, size = factor(labels, levels = labels), shape = NA), data = df_texp) +
-    guides(size = guide_legend("GO Terms", ncol = 4, byrow = T, override.aes = list(shape = 22, fill = unique(cols), size = 8))) +
-    theme(legend.text = element_text(size = process.label)) +
-    geom_text(aes(xgen, ygen, label = labels, angle = angle), data = df_texg, size = gene.size) +
-    geom_polygon(aes(x = lx, y = ly, group = ID), data = df_path, fill = colRibb, color = 'black', size = border.size, inherit.aes = F) +		
-    labs(title = title) +
-    theme_blank
+  g <- ggplot() + geom_polygon(data = df_process, aes(x, y, group = id), fill = "gray70", inherit.aes = F, color = "black") + 
+    geom_polygon(data = df_process, aes(x, y, group = id), fill = cols, inherit.aes = F, alpha = 0.6, color = "black") +
+    geom_text(aes(xgen, ygen, label = labels, angle = angle), hjust=1, vjust=.5, data = df_texg, size = gene.size) + 
+    geom_polygon(aes(x = lx, y = ly, group = ID), data = df_path, fill = colRibb, color = "black", size = border.size, inherit.aes = F) + 
+    labs(title = title) + theme_blank
+  
+  if(label_term)
+    g <- g + geom_text(aes(x = xpro, y = ypro, label = labels, angle=angle), hjust=0, vjust=.5, data = df_texp, size = process.label)
+  if(guide_term)
+    g <- g + geom_point(aes(x = xpro, y = ypro, size = factor(labels, levels = labels), shape = NA), data = df_texp) + 
+      guides(size = guide_legend("GO Terms", ncol = 2, byrow = T, override.aes = list(shape = 22, fill = unique(cols), size = 8))) + 
+      theme(legend.text = element_text(size = 10))
   
   if (nlfc >= 1){
     g + geom_polygon(data = df_genes, aes(x, y, group = id, fill = logFC), inherit.aes = F, color = 'black') +
       scale_fill_gradient2(scale.title, space = 'Lab', low = lfc.col[3], mid = lfc.col[2], high = lfc.col[1], guide = guide_colorbar(title.position = "top", title.hjust = 0.5), 
-                           breaks = c(min(df_genes$logFC), max(df_genes$logFC)), labels = c(round(min(df_genes$logFC)), round(max(df_genes$logFC)))) +
+                           breaks = range(df_genes$logFC, na.rm=T), labels = c(round(min(df_genes$logFC)), round(max(df_genes$logFC)))) +
       theme(legend.position = 'bottom', legend.background = element_rect(fill = 'transparent'), legend.box = 'horizontal', legend.direction = 'horizontal')
   }else{
     g + geom_polygon(data = df_genes, aes(x, y, group = id), fill = 'gray50', inherit.aes = F, color = 'black')+
